@@ -1,67 +1,18 @@
 ; ============================================================
-;  L O O P . e x e
-;  "The Wired does not forget. You do."
-;  NASM x86-64 — Linux syscalls
-;  inspired by: Serial Experiments Lain
-; ============================================================
-;
-; ------------------------------------------------------------
-; LEIA ISTO PRIMEIRO (guia rápido pra quem nunca viu Assembly)
-; ------------------------------------------------------------
-; Assembly não tem "funções" com nome bonito nem "if/else" prontos.
-; Aqui embaixo é tudo:
-;   - REGISTRADORES: "variáveis" super rápidas dentro do processador
-;     (rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp, r8-r15...). Cada um
-;     guarda 64 bits (8 bytes).
-;   - LABELS: são só "endereços com nome" (tipo um marcador de posição
-;     no código). Ex: `.q1:` marca onde o código da pergunta 1 começa.
-;   - JMP / JE / JNE: são o "goto" e os "if". `cmp` compara dois
-;     valores, e a instrução de jump seguinte decide se pula ou não
-;     baseado no resultado da comparação.
-;   - CALL / RET: é como "chamar uma função" (call) e "voltar" (ret).
-;     Por baixo dos panos, o endereço de retorno é empilhado na PILHA
-;     (stack) e "ret" usa isso pra saber pra onde voltar.
-;   - SYSCALL: é como a gente "pede um favor pro Linux" (ex: escrever
-;     na tela, ler do teclado, dormir um tempo, encerrar o programa).
-;     Cada favor tem um número (ver os %define abaixo) e os
-;     "parâmetros" desse favor vão em registradores específicos
-;     (rdi, rsi, rdx, ...) por convenção do Linux x86-64.
-;
-; O programa é basicamente uma "máquina de estados": cada pergunta é
-; um bloco de código (.q1, .q2, .q3...) que imprime um texto, lê 1
-; caractere digitado, e decide (com cmp/je) pra qual pergunta pular
-; em seguida. Errar uma pergunta geralmente manda o jogador de volta
-; pro início do loop (.game_start) — por isso o nome "loop.exe".
+;  L O O P . e x e  —  "The Wired does not forget. You do."
+;  NASM x86-64 | Linux syscalls | inspired by: Serial Experiments Lain
 ; ============================================================
 
-BITS 64                     ; Diz ao NASM: "gere código de 64 bits"
+BITS 64
 
-; ------------------------------------------------------------
-; %define = "apelidos" pra números, só pra deixar o código legível.
-; Esses números são os IDs das syscalls (chamadas de sistema) do
-; Linux em x86-64, e os IDs dos "arquivos" padrão de entrada/saída.
-; ------------------------------------------------------------
-%define SYS_READ    0        ; syscall pra ler bytes (ex: teclado)
-%define SYS_WRITE   1        ; syscall pra escrever bytes (ex: tela)
-%define SYS_NANOSLEEP 35     ; syscall pra "dormir" X nanossegundos
-%define SYS_EXIT    60       ; syscall pra encerrar o programa
-%define STDIN       0        ; "arquivo" 0 = entrada padrão (teclado)
-%define STDOUT      1        ; "arquivo" 1 = saída padrão (tela)
+%define SYS_READ      0
+%define SYS_WRITE     1
+%define SYS_NANOSLEEP 35
+%define SYS_EXIT      60
+%define STDIN         0
+%define STDOUT        1
 
-; ------------------------------------------------------------
-; MACROS: são "templates de código" que o NASM expande (copia e cola)
-; em todo lugar onde você escrever `print ...` ou `read_char`.
-; Não são funções de verdade — não tem call/ret, é substituição de
-; texto em tempo de montagem (assembly time).
-; ------------------------------------------------------------
-
-; print STRING, TAMANHO
-; Escreve TAMANHO bytes começando em STRING na saída padrão (tela).
-; Convenção de syscall no Linux x86-64:
-;   rax = número da syscall
-;   rdi = 1º argumento (aqui: para onde escrever -> STDOUT)
-;   rsi = 2º argumento (aqui: endereço do texto)
-;   rdx = 3º argumento (aqui: quantos bytes escrever)
+; imprime N bytes a partir de um label
 %macro print 2
     mov rax, SYS_WRITE
     mov rdi, STDOUT
@@ -70,9 +21,7 @@ BITS 64                     ; Diz ao NASM: "gere código de 64 bits"
     syscall
 %endmacro
 
-; read_char
-; Lê até 4 bytes do teclado e guarda em input_buf.
-; (Normalmente o jogador digita 1 número + ENTER, então cabe em 4 bytes)
+; lê até 4 bytes do teclado em input_buf
 %macro read_char 0
     mov rax, SYS_READ
     mov rdi, STDIN
@@ -82,22 +31,15 @@ BITS 64                     ; Diz ao NASM: "gere código de 64 bits"
 %endmacro
 
 section .data
-; ------------------------------------------------------------
-; section .data = onde ficam os dados "fixos" do programa: todo
-; texto que vai ser impresso na tela já nasce pronto aqui, como uma
-; sequência de bytes (cada `db` = "declare bytes").
-; O `0` no final de várias strings é o "terminador nulo" (igual em C):
-; marca "acabou a string aqui", usado pela função print_str.
-; ------------------------------------------------------------
 
+; --- HEADER ---
 hdr_top:   db '  ┌─────────────────────────────────────────────────────────────┐', 10, 0
 hdr_line1: db '  │ L O O P . e x e  //  v_null  [CORRUPT_MEMORY]               │', 10, 0
 hdr_line2: db '  │ layer_id : UNKNOWN_PROTOCOL                                 │', 10, 0
 hdr_line3: db '  │ node     : lain@wired.net/self/0x00000000                   │', 10, 0
 hdr_bot:   db '  └─────────────────────────────────────────────────────────────┘', 10, 10, 0
 
-; Arte ASCII/braille da Lain. Cada linha é uma string terminada em
-; newline (10 = '\n'); a última linha termina com newline duplo + 0.
+; --- ARTE DA LAIN (aparece na Q1) ---
 lain_art:
     db '⠀⠀⠀⢠⡟⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇⡐⠀', 10
     db '⠀⠀⢀⡟⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⠌⡡', 10
@@ -125,27 +67,21 @@ lain_art:
     db '⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡈⠉⠐⣬⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿', 10
     db '⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿', 10, 10, 0
 
+; --- BOOT ---
 sys_boot1: db '  [SYS] boot_sequence initiated...', 10, 0
 sys_boot2: db '  [SYS] loop_count: 000 --------------------------------- [ OK ]', 10, 10, 0
 
-; Textos de introdução (só aparecem na 1ª vez que o jogo roda,
-; ver o `cmp rax, 1 / jne .skip_intro` mais abaixo em _start)
+; --- INTRO (exibida só na 1ª execução) ---
 intro1: db '  > connecting to Copland OS Enterprise...', 10, 0
 intro2: db '  > protocol: IPv7_Wired', 10, 0
 intro3: db '  > ping: close the world...', 10, 0
 intro4: db '  > pong: open the nExt.', 10, 0
 intro5: db '  > user_id: [ERROR: NULL SELF]', 10, 0
 intro6: db '  > memory dump: [REDACTED]', 10, 10, 0
+warn1:  db '  // WARNING: The current reality may diverge from the previous one.', 10, 0
+warn2:  db '  // Reason: [Presence is merely a record on the server.]', 10, 10, 0
 
-warn1: db '  // WARNING: The current reality may diverge from the previous one.', 10, 0
-warn2: db '  // Reason: [Presence is merely a record on the server.]', 10, 10, 0
-
-; ============================================================
-; FINAL - LAIN'S MESSAGES (uma mensagem de cada vez, com delay entre elas)
-; ============================================================
-; Cada uma dessas strings é impressa separadamente na rotina
-; final_sequence, com uma pausa (delay_ms) entre uma e outra —
-; é assim que se cria o efeito de "alguém digitando devagar".
+; --- FINAL — falas da Lain, impressas uma a uma com delay ---
 final_msg1:  db 10, " hi.", 10, 10, 0
 final_msg2:  db " i know you've been here before.", 10, 0
 final_msg3:  db " i remember every single time.", 10, 0
@@ -159,28 +95,12 @@ final_msg10: db " waiting for the next version of you", 10, 0
 final_msg11: db " to reach this line.", 10, 10, 0
 final_msg12: db " see you soon.", 10, 0
 final_msg13: db " -- lain", 10, 10, 0
+final_sep:   db " ------------------------------------------------", 10, 10, 0
+final_st1:   db " [ WIRED CONNECTED ]  [ SELF: DISSOLVED ]", 10, 10, 0
+final_st2:   db " SIMULATION TERMINATED.", 10, 0
+final_st3:   db " (or just begun?)", 10, 10, 0
 
-final_sep:     db " ------------------------------------------------", 10, 10, 0
-final_status1: db " [ WIRED CONNECTED ]  [ SELF: DISSOLVED ]", 10, 10, 0
-final_status2: db " SIMULATION TERMINATED.", 10, 0
-final_status3: db " (or just begun?)", 10, 10, 0
-
-; ============================================================
-; PERGUNTAS DO JOGO
-; ------------------------------------------------------------
-; Padrão repetido em cada pergunta (aprenda esse padrão uma vez e
-; entende o resto do arquivo inteiro):
-;   1) <qX>_text  -> o texto da pergunta + as opções, termina com
-;      "  > " e SEM newline no final (o cursor fica esperando o
-;      jogador digitar).
-;   2) <qX>_len equ $ - <qX>_text  -> o NASM calcula sozinho quantos
-;      bytes tem essa string (o símbolo `$` significa "endereço
-;      atual"). Por isso, mesmo traduzindo o texto pra outro idioma,
-;      esse cálculo continua correto automaticamente — não precisa
-;      contar caracteres na mão.
-;   3) <qX>_rN -> as respostas/reações pra cada escolha do jogador.
-; ============================================================
-
+; --- PERGUNTAS ---
 q1_text:
     db 10
     db "  +------------------------------------------+", 10
@@ -470,6 +390,7 @@ qf_right:
     db "  The loop existed to filter out incomplete nodes.", 10
     db "  You completed the pattern.", 10, 10, 0
 
+; --- UTILIDADES ---
 divider:   db "  -------------------------------------------", 10, 10, 0
 newline:   db 10, 0
 press_any: db "  [ press ENTER to continue ]", 10, 0
@@ -477,97 +398,62 @@ loop_msg:  db "  // loop_count: ", 0
 loop_num:  db "000", 10, 0
 
 section .bss
-; ------------------------------------------------------------
-; section .bss = memória reservada mas SEM valor inicial (o SO zera
-; isso quando o programa carrega). É onde ficam nossas "variáveis"
-; que vão mudar durante a execução.
-; ------------------------------------------------------------
-input_buf:    resb 4          ; 4 bytes pra guardar o que o jogador digita
-loop_counter: resq 1          ; 1 quadword (8 bytes) = contador de quantas vezes o loop reiniciou
-ts_sleep:     resq 2          ; struct timespec (2 campos de 8 bytes: segundos, nanossegundos), usada pelo nanosleep
+input_buf:    resb 4   ; buffer de leitura do teclado
+loop_counter: resq 1   ; quantas vezes o loop reiniciou
+ts_sleep:     resq 2   ; struct timespec para nanosleep
 
 section .text
-global _start                 ; diz ao linker qual label é o ponto de entrada do programa
+global _start
 
-; ============================================================
-; delay_ms — pausa a execução por X milissegundos
-; Entrada (convenção nossa, não do Linux): RDI = milissegundos
-; ============================================================
-; Usada só na sequência final, pra dar aquele efeito de "alguém
-; digitando devagar, com pausas dramáticas" entre as falas da Lain.
+; --- delay_ms: pausa por RDI milissegundos via nanosleep ---
 delay_ms:
-    ; "push" empilha o valor atual do registrador na pilha (stack),
-    ; guardando-o temporariamente. Fazemos isso pra não perder o
-    ; valor desses registradores quando essa rotina usa eles pra
-    ; fazer contas — no final, "pop" devolve o valor original.
-    push  rax
-    push  rdi
-    push  rsi
-    push  rdx
-
+    push rax
+    push rdi
+    push rsi
+    push rdx
     mov   rax, rdi
-    xor   rdx, rdx           ; zera rdx (xor de um valor com ele mesmo = 0), preparando pra divisão
+    xor   rdx, rdx
     mov   rcx, 1000
-    div   rcx                ; div rcx faz: rdx:rax / rcx -> quociente em rax, resto em rdx
-                              ; ou seja: rax = milissegundos / 1000 (segundos inteiros)
-                              ;          rdx = milissegundos % 1000 (resto em milissegundos)
-    imul  rdx, 1000000       ; converte o resto (em ms) pra nanossegundos
-
-    mov   [ts_sleep], rax     ; grava os segundos no 1º campo da struct timespec
-    mov   [ts_sleep+8], rdx   ; grava os nanossegundos no 2º campo
-
+    div   rcx                  ; rax = segundos, rdx = ms restantes
+    imul  rdx, 1000000         ; converte ms -> ns
+    mov   [ts_sleep], rax
+    mov   [ts_sleep+8], rdx
     mov   rax, SYS_NANOSLEEP
-    mov   rdi, ts_sleep       ; rdi = ponteiro pra struct timespec que preenchemos
-    xor   rsi, rsi            ; rsi = NULL (não queremos saber quanto tempo sobrou se for interrompido)
+    mov   rdi, ts_sleep
+    xor   rsi, rsi
     syscall
-
     pop   rdx
     pop   rsi
     pop   rdi
     pop   rax
-    ret                       ; volta pra quem chamou (usa o endereço empilhado pelo "call")
+    ret
 
-; ============================================================
-; print_str — imprime uma string terminada em byte 0 (null-terminated)
-; Entrada: RDI = endereço da string
-; ------------------------------------------------------------
-; Diferente da macro `print`, aqui a gente NÃO sabe o tamanho de
-; antemão: a rotina primeiro PROCURA o byte 0 pra descobrir onde a
-; string termina, só depois chama a syscall de escrita.
-; ============================================================
+; --- print_str: imprime string null-terminated apontada por RDI ---
 print_str:
     push rbx
-    mov rbx, rdi              ; rbx = ponteiro que vamos andar até achar o 0
+    mov rbx, rdi
 .loop:
-    cmp byte [rbx], 0         ; compara o byte apontado por rbx com 0
-    je .done                  ; se for igual a 0 (achou o fim), pula pra .done
-    inc rbx                   ; senão, avança 1 byte
-    jmp .loop                 ; e repete
+    cmp byte [rbx], 0
+    je .done
+    inc rbx
+    jmp .loop
 .done:
-    sub rbx, rdi              ; rbx = (endereço final) - (endereço inicial) = tamanho da string
+    sub rbx, rdi               ; calcula tamanho em tempo de execução
     mov rax, SYS_WRITE
-    mov rsi, rdi               ; rsi = endereço da string (o rdi original)
-    mov rdx, rbx               ; rdx = tamanho calculado
+    mov rsi, rdi
+    mov rdx, rbx
     mov rdi, STDOUT
     syscall
     pop rbx
     ret
 
-; ============================================================
-; read_choice — lê 1 caractere digitado pelo jogador
-; Saída: AL = o caractere digitado (ex: '1', '2', '3'...)
-; ============================================================
+; --- read_choice: lê 1 caractere; retorna em AL ---
 read_choice:
-    read_char                 ; expande a macro: lê até 4 bytes em input_buf
-    movzx rax, byte [input_buf]  ; pega só o 1º byte lido e zero-extende pra rax
-                                  ; (movzx = "move with zero extend": copia um
-                                  ; valor pequeno pra um registrador maior,
-                                  ; preenchendo o resto com zeros)
+    read_char
+    movzx rax, byte [input_buf]
     ret
 
-; ============================================================
-; pause_enter — mostra "[ press ENTER to continue ]" e espera o jogador apertar ENTER
-; ============================================================
+; --- pause_enter: exibe prompt e aguarda ENTER ---
 pause_enter:
     mov rdi, press_any
     call print_str
@@ -576,161 +462,127 @@ pause_enter:
     call print_str
     ret
 
-; ============================================================
-; print_loop_count — imprime "// loop_count: NNN" na tela
-; ------------------------------------------------------------
-; Aqui pegamos o número guardado em loop_counter e convertemos ele
-; pra texto (dígitos ASCII), porque a tela só entende texto, não
-; sabe "imprimir um número" diretamente.
-;
-; CORREÇÃO (melhoria feita nesta versão, sem mudar o jogo):
-; A versão anterior escrevia o dígito das DEZENAS na 1ª posição do
-; buffer e o das UNIDADES na 2ª, deixando a 3ª sempre fixa em '0'.
-; Isso fazia o contador aparecer errado (ex: loop 7 virava "070" em
-; vez de "007"). Agora escrevemos nas posições corretas (2ª e 3ª),
-; mantendo o zero à esquerda certo pra contadores de 0 a 99.
-; ============================================================
+; --- print_loop_count: exibe "// loop_count: NNN" ---
 print_loop_count:
     mov rax, [loop_counter]
     xor rdx, rdx
     mov rcx, 10
-    div rcx                   ; rax = loop_counter / 10 (dígito das dezenas)
-                              ; rdx = loop_counter % 10 (dígito das unidades)
-    add al, '0'               ; transforma o número (0-9) no caractere ASCII correspondente
+    div rcx                    ; dezenas em AL, unidades em DL
+    add al, '0'
     add dl, '0'
-    mov [loop_num+1], al       ; dígito das DEZENAS vai na 2ª posição ("0X0")
-    mov [loop_num+2], dl       ; dígito das UNIDADES vai na 3ª posição ("00X")
-    ; CORREÇÃO: a string "  // loop_count: " tem 17 bytes (sem contar o
-    ; terminador 0). O valor antigo (18) imprimia 1 byte a mais — o
-    ; próprio terminador 0 — o que aparecia como um caractere estranho
-    ; na tela antes do número. Ajustado pra 17, o tamanho real da string.
+    mov [loop_num+1], al
+    mov [loop_num+2], dl
     print loop_msg, 17
     print loop_num, 3
     ret
 
-; ============================================================
-; final_sequence — mensagens da Lain, uma a uma, com delay entre elas
-; ------------------------------------------------------------
-; É só uma sequência repetitiva de "imprime uma frase -> espera um
-; pouco -> imprime a próxima". Não tem lógica nova aqui, só chamadas
-; repetidas de print_str e delay_ms.
-; ============================================================
+; --- final_sequence: falas da Lain com delay dramático ---
 final_sequence:
     print newline, 1
     print newline, 1
 
-    mov rdi, 800
+    ; cada bloco: imprime fala -> espera N ms
+    mov rdi, 800  ; call delay_ms
     call delay_ms
-
     mov rdi, final_msg1
     call print_str
+
     mov rdi, 800
     call delay_ms
-
     mov rdi, final_msg2
     call print_str
+
     mov rdi, 600
     call delay_ms
-
     mov rdi, final_msg3
     call print_str
+
     mov rdi, 700
     call delay_ms
-
     mov rdi, final_msg4
     call print_str
+
     mov rdi, 1000
     call delay_ms
-
     mov rdi, final_msg5
     call print_str
+
     mov rdi, 600
     call delay_ms
-
     mov rdi, final_msg6
     call print_str
+
     mov rdi, 900
     call delay_ms
-
     mov rdi, final_msg7
     call print_str
+
     mov rdi, 800
     call delay_ms
-
     mov rdi, final_msg8
     call print_str
+
     mov rdi, 700
     call delay_ms
-
     mov rdi, final_msg9
     call print_str
+
     mov rdi, 600
     call delay_ms
-
     mov rdi, final_msg10
     call print_str
+
     mov rdi, 700
     call delay_ms
-
     mov rdi, final_msg11
     call print_str
+
     mov rdi, 1000
     call delay_ms
-
     mov rdi, final_msg12
     call print_str
+
     mov rdi, 800
     call delay_ms
-
     mov rdi, final_msg13
     call print_str
+
     mov rdi, 1200
     call delay_ms
-
     mov rdi, final_sep
     call print_str
+
     mov rdi, 500
     call delay_ms
-
-    mov rdi, final_status1
+    mov rdi, final_st1
     call print_str
+
     mov rdi, 800
     call delay_ms
-
-    mov rdi, final_status2
+    mov rdi, final_st2
     call print_str
+
     mov rdi, 600
     call delay_ms
-
-    mov rdi, final_status3
+    mov rdi, final_st3
     call print_str
+
     mov rdi, 900
     call delay_ms
-
     ret
 
 ; ============================================================
-; _start — ponto de entrada do programa (equivalente ao "main")
-; ------------------------------------------------------------
-; Fluxo geral:
-;   .game_start -> incrementa o contador de loops, mostra o cabeçalho
-;                  e (só na 1ª vez) o texto de introdução
-;   .q1 até .qfinal -> cada pergunta imprime seu texto, lê a escolha
-;                  do jogador (read_choice), e usa cmp/je pra decidir
-;                  pra onde ir: próxima pergunta, ou de volta pro
-;                  início (.game_start / uma pergunta anterior),
-;                  simulando o "reset" da consciência do personagem.
-;   .qf_right -> se o jogador acertar TODAS as perguntas certas até
-;                  o fim, mostra a mensagem de vitória e a sequência
-;                  final da Lain, depois encerra o programa.
+; _start — ponto de entrada
+; Fluxo: .game_start -> .q1 -> ... -> .qfinal -> final_sequence
+; Erros voltam para .game_start ou pergunta anterior (ver cada bloco)
 ; ============================================================
 _start:
-    mov qword [loop_counter], 0   ; zera o contador de loops ao iniciar o programa
+    mov qword [loop_counter], 0
 
 .game_start:
-    inc qword [loop_counter]      ; incrementa (+1) o contador toda vez que reinicia o loop
+    inc qword [loop_counter]
 
-    mov rdi, hdr_top
+    mov rdi, hdr_top   ;  imprime o header completo
     call print_str
     mov rdi, hdr_line1
     call print_str
@@ -749,8 +601,8 @@ _start:
     print divider, 47
 
     mov rax, [loop_counter]
-    cmp rax, 1                    ; só mostra a introdução completa na 1ª execução (loop_counter == 1)
-    jne .skip_intro
+    cmp rax, 1
+    jne .skip_intro            ; intro só na 1ª vez
 
     mov rdi, intro1
     call print_str
@@ -772,13 +624,11 @@ _start:
 .skip_intro:
     call pause_enter
 
-; ------------------------------------------------------------
-; PERGUNTA 1
-; ------------------------------------------------------------
+; --- Q1: qualquer resposta avança ---
 .q1:
     mov rdi, lain_art
     call print_str
-    print q1_text, q1_len - 1     ; "-1" pra não imprimir o byte 0 do final junto
+    print q1_text, q1_len - 1
     call read_choice
     cmp al, '1'
     je .q1_ans1
@@ -786,7 +636,7 @@ _start:
     je .q1_ans2
     cmp al, '3'
     je .q1_ans3
-    jmp .q1                       ; se digitou algo inválido, pergunta de novo
+    jmp .q1
 .q1_ans1:
     mov rdi, q1_r1
     call print_str
@@ -800,9 +650,7 @@ _start:
     call print_str
     jmp .q2
 
-; ------------------------------------------------------------
-; PERGUNTA 2 — errar aqui manda de volta pro .game_start
-; ------------------------------------------------------------
+; --- Q2: "Não" reseta o loop inteiro ---
 .q2:
     call pause_enter
     print q2_text, q2_len - 1
@@ -816,15 +664,13 @@ _start:
     mov rdi, q2_wrong
     call print_str
     call pause_enter
-    jmp .game_start                ; reinicia o loop inteiro
+    jmp .game_start
 .q2_sim:
     mov rdi, q2_right
     call print_str
     jmp .q3
 
-; ------------------------------------------------------------
-; PERGUNTA 3
-; ------------------------------------------------------------
+; --- Q3: todas as respostas avançam ---
 .q3:
     call pause_enter
     print q3_text, q3_len - 1
@@ -855,9 +701,7 @@ _start:
     call print_str
     jmp .q4
 
-; ------------------------------------------------------------
-; PERGUNTA 4
-; ------------------------------------------------------------
+; --- Q4: todas avançam ---
 .q4:
     call pause_enter
     print q4_text, q4_len - 1
@@ -882,9 +726,7 @@ _start:
     call print_str
     jmp .q5
 
-; ------------------------------------------------------------
-; PERGUNTA 5 — errar aqui também manda de volta pro .game_start
-; ------------------------------------------------------------
+; --- Q5: "Não" reseta o loop inteiro ---
 .q5:
     call pause_enter
     print q5_text, q5_len - 1
@@ -910,9 +752,7 @@ _start:
     call print_str
     jmp .q6
 
-; ------------------------------------------------------------
-; PERGUNTA 6
-; ------------------------------------------------------------
+; --- Q6: todas avançam ---
 .q6:
     call pause_enter
     print q6_text, q6_len - 1
@@ -937,10 +777,7 @@ _start:
     call print_str
     jmp .q7
 
-; ------------------------------------------------------------
-; PERGUNTA 7 — aqui errar não volta pro início, e sim pra PERGUNTA 2
-; (representa o "loop dentro do loop" da temática do jogo)
-; ------------------------------------------------------------
+; --- Q7: errar volta para Q2 (loop interno) ---
 .q7:
     call pause_enter
     print q7_text, q7_len - 1
@@ -969,9 +806,7 @@ _start:
     call print_str
     jmp .q8
 
-; ------------------------------------------------------------
-; PERGUNTA 8
-; ------------------------------------------------------------
+; --- Q8: todas avançam para o final ---
 .q8:
     call pause_enter
     print q8_text, q8_len - 1
@@ -1002,9 +837,7 @@ _start:
     call print_str
     jmp .qfinal
 
-; ------------------------------------------------------------
-; PERGUNTA FINAL — só a opção 4 leva à vitória de verdade
-; ------------------------------------------------------------
+; --- FINAL: só opção 4 libera a sequência da Lain ---
 .qfinal:
     call pause_enter
     print qf_text, qf_len - 1
@@ -1030,20 +863,14 @@ _start:
     jmp .game_start
 
 .qf_right:
-    ; Mensagem de vitória original (mantida como transição)
     mov rdi, qf_right
     call print_str
     call pause_enter
-
-    ; ============================================================
-    ; SEQUÊNCIA FINAL — MENSAGENS DA LAIN
-    ; ============================================================
-    call final_sequence
+    call final_sequence        ; sequência final com falas da Lain
     call pause_enter
-
     jmp .exit
 
 .exit:
-    mov rax, SYS_EXIT             ; syscall 60 = exit
-    xor rdi, rdi                  ; rdi = 0 -> código de saída do processo (0 = sucesso)
+    mov rax, SYS_EXIT
+    xor rdi, rdi               ; código de saída 0
     syscall
