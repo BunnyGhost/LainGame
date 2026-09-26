@@ -10,238 +10,220 @@
 
 > *"The Wired does not forget. You do."*
 
-Um jogo de perguntas filosóficas escrito inteiramente em **Assembly x86-64 puro** — sem engine, sem framework, sem libc, sem `npm install`. Apenas registradores, syscalls e memória crua. Inspirado no anime **Serial Experiments Lain**.
+Um jogo de perguntas filosóficas escrito em **Assembly x86-64 puro**, sem engine, sem framework, sem libc. Só registradores, syscalls e memória. Inspirado em Serial Experiments Lain.
 
-Se React é uma cidade construída com prédios pré-fabricados, isso aqui é cavar uma caverna com as próprias mãos. Não tem `useState`. Não tem garbage collector. Não tem ninguém te segurando a mão — só você, o processador, e o Linux escutando do outro lado da syscall.
-
-> **Por que o header mostra `loop.exe` se o projeto se chama LainGame?**
-> `LainGame` é o nome do repositório — o rótulo que você usa pra encontrar e clonar o projeto. Mas o próprio programa, quando roda, se identifica internamente como `loop.exe` (e nem é um `.exe` de verdade: o binário gerado é um **ELF64**, o formato nativo do Linux — você chama ele só de `loop`). Essa dupla identidade não é acidente de nomenclatura, ela meio que combina com o tema: por fora você sabe que baixou "LainGame", mas o que roda na sua tela insiste em se chamar outra coisa — o mesmo tipo de dissonância entre identidade e rótulo que o jogo pergunta o tempo todo.
+> **Por que `loop.exe` se o repo se chama LainGame?**
+> `LainGame` é o nome do repositório. O binário gerado é um **ELF64** nativo do Linux e se chama só `loop`. O `.exe` no header do jogo é intencional: combina com o tema de identidade fragmentada. Por fora você baixou "LainGame", mas o que roda na tela insiste em ser outra coisa.
 
 ---
 
-## 🧠 O que é isso
+## O que é isso
 
-Um experimento interativo de terminal onde o jogador enfrenta perguntas sobre **consciência, identidade, memória e realidade**. A maioria das respostas erradas reinicia o loop. Só quem entende o padrão chega ao fim — e o próprio código foi desenhado pra ensinar esse padrão te fazendo repeti-lo.
+Um experimento de terminal onde o jogador responde perguntas sobre consciência, identidade e realidade. A maioria das respostas erradas reinicia o loop. Só quem entende o padrão chega ao fim.
 
-Tematicamente inspirado em Serial Experiments Lain:
-- A **Wired** como camada de consciência distribuída
-- Fragmentação do **self** em múltiplas instâncias
-- O corpo físico como **dispositivo de acesso** descartável
-- Memória corrompida, protocolos desconhecidos, loops infinitos
-- A pergunta final: *"O que é este lugar?"*
-
-O jogo não tem save, não tem menu, não tem barra de progresso. Ele te trata exatamente como a Wired trataria: você entra, esquece, e tenta de novo.
+Referências diretas de Lain espalhadas por todo o jogo: a Wired como consciência distribuída, fragmentação do self, o corpo como dispositivo de acesso descartável, memória corrompida, loops infinitos. O jogo não tem save, não tem menu. Ele te trata como a Wired trataria.
 
 ---
 
-## 🗺️ Para quem vem de JS/TS/C#/Node: um mapa mental rápido
+## Pra quem vem de JS/TS/C#/Node
 
-Assembly não tem nenhuma das abstrações que você usa todo dia. Mas quase tudo aqui tem um "primo distante" em linguagens de alto nível — só que sem a parte confortável. Essa tabela é o atalho:
+Assembly não tem nenhuma das abstrações que você usa todo dia. Mas tudo tem um equivalente, só sem a parte confortável:
 
-| Em Assembly | Em JS/TS/C#/Node, seria mais ou menos... | A diferença que dói |
+| Assembly | JS/TS/C#/Node | O que muda |
 |---|---|---|
-| Registrador (`rax`, `rdi`...) | Uma variável `let` | Você tem uns 14 no total, e o processador inteiro disputa eles. Não existe "criar mais uma variável" |
-| `.data` / `.bss` / `.text` | Separar seu bundle em `const` globais / estado mutável / código | Aqui não é convenção, é o **layout literal na memória** — o SO carrega cada seção num endereço diferente |
-| `mov`, `add`, `cmp` | Atribuição, soma, `if (a === b)` | Não existe expressão composta. Cada linha faz **uma coisa** |
-| `je` / `jne` / `jmp` | `if`, `else`, `while`, `for` | Todos eles, na real, viram isso por baixo dos panos — até no seu código TypeScript |
-| `call` / `ret` | Chamar uma função e dar `return` | Sem closures, sem `this`, sem parâmetros nomeados — os "argumentos" vão em registradores combinados na unha |
-| `push` / `pop` (stack) | O call stack que aparece no seu stack trace | Aqui você gerencia essa pilha manualmente quando precisa preservar um valor |
-| Syscall (`SYS_WRITE`, `SYS_READ`) | `fetch()`, `fs.writeFile()`, `console.log()` | Não tem runtime, não tem Node por trás. É o pedido **cru** direto pro kernel do Linux |
-| Macro (`%macro print`) | Um snippet de VS Code, ou o pré-processador do C | Não é uma função — é **copiar e colar texto** antes mesmo de compilar. Zero overhead, zero abstração |
-| String `db "...", 0` | `"minha string"` | JS/C# guardam o tamanho da string junto. Aqui, o "tamanho" é **procurado em runtime**, byte a byte, até achar um `0` |
-| Nenhum garbage collector | O GC do V8 / do .NET | Se você não reserva o espaço certo (`resb`, `resq`) e não limpa depois, é problema seu. Pra sempre |
-
-Se você já debugou um `NullReferenceException` em C# ou um `undefined is not a function` em JS, imagina isso **sem stack trace, sem mensagem de erro, só um segfault seco**. É esse o nível de "sem rede de segurança" que a Wired opera.
+| Registrador (`rax`, `rdi`...) | `let x` | Você tem ~14 no total, o processador inteiro disputa eles |
+| `.data` / `.bss` / `.text` | globais / estado mutável / código | Não é convenção, é o layout **literal** na memória |
+| `mov`, `add`, `cmp` | atribuição, soma, `===` | Cada linha faz uma coisa só |
+| `je` / `jne` / `jmp` | `if`, `else`, `while`, `for` | Todo controle de fluxo vira isso por baixo dos panos |
+| `call` / `ret` | chamar função + `return` | Sem closures, sem `this`, argumentos passam por registradores |
+| `push` / `pop` | call stack do seu stack trace | Você gerencia na mão |
+| Syscall | `console.log()`, `fetch()`, `fs.readFile()` | Pedido cru direto pro kernel, sem runtime |
+| Macro (`%macro print`) | snippet / pré-processador | Não é função, é copiar e colar texto antes de compilar |
+| String `db "...", 0` | `"string"` | JS/C# guardam o tamanho junto. Aqui você procura o fim byte a byte |
 
 ---
 
-## ⚙️ Como o jogo funciona por dentro
+## Como o jogo funciona por dentro
 
-### A metáfora certa: uma máquina de estados, não um "programa"
+### Uma máquina de estados
 
-Esqueça a ideia de "código que roda de cima pra baixo". Pensa nisso como uma **state machine** — tipo um reducer do Redux, só que cada "estado" é um `label` no Assembly e a "transição" é um `jmp`:
+Cada pergunta é um label no código. Acertar avança. Errar é um `jmp` de volta pra algum ponto anterior, sem stack unwind, sem `finally`, sem mensagem de erro.
 
 ```
 _start
-  └── .game_start        ← incrementa loop_counter, imprime header + ASCII art
-        ├── .q1          "Você está acordado?"
-        ├── .q2          "Você já respondeu essa pergunta antes?"
-        ├── .q3          "Quem construiu este lugar?"
-        ├── .q4          "Quantos 'você' existem agora?"
-        ├── .q5          "Você está sendo observado?"
-        ├── .q6          "O que é real?"
-        ├── .q7          "Qual é a saída?"
-        ├── .q8          "Quem é Lain?"
-        └── .qfinal      "O que é este lugar?"
-             └── final_sequence   ← mensagens da Lain com delays
-                  └── .exit       ← SYS_EXIT
+  └── .game_start
+        ├── .q1 .q2 .q3 .q4 .q5 .q6 .q7 .q8
+        └── .qfinal
+              └── final_sequence
+                    └── .exit
 ```
 
-Cada pergunta é um "nó" desse grafo. Errar não é "game over" — é uma **aresta que te leva de volta pra um nó anterior**. Não existe pilha de chamadas te levando pro topo de novo automaticamente: o `jmp .game_start` literalmente teleporta a execução pro início, sem `return`, sem stack unwind, sem `finally`.
+### Anatomia de uma pergunta
 
-### Anatomia de uma pergunta (o padrão que se repete 9 vezes)
-
-Toda pergunta segue exatamente essa receita — aprenda ela uma vez e você já leu o arquivo inteiro:
+Esse padrão se repete 9 vezes no código inteiro. Aprende uma vez, leu tudo:
 
 ```asm
 .q1:
-    print q1_text, q1_len - 1    ; 1) imprime a pergunta na tela
-    call read_choice             ; 2) lê 1 caractere do teclado
-    cmp al, '1'                  ; 3) compara com a opção 1
-    je .q1_ans1                  ;    se for igual, pula pra lá
+    print q1_text, q1_len - 1    ; imprime a pergunta
+    call read_choice             ; lê 1 caractere do teclado, retorna em AL
+    cmp al, '1'                  ; compara com '1'
+    je .q1_ans1                  ; se igual, pula pra resposta 1
     cmp al, '2'
     je .q1_ans2
     cmp al, '3'
     je .q1_ans3
-    jmp .q1                      ; 4) input inválido → pergunta de novo
+    jmp .q1                      ; input inválido, repete
 ```
 
-Se isso fosse escrito em JavaScript, ficaria assim:
+Em JS ficaria `if (answer === '1') return q1_ans1()`. A diferença é que em Assembly isso não é açúcar sintático escondendo nada. É literalmente o que a CPU executa.
 
-```js
-function q1() {
-  print(q1_text);
-  const answer = readChoice();
-  if (answer === '1') return q1_ans1();
-  if (answer === '2') return q1_ans2();
-  if (answer === '3') return q1_ans3();
-  return q1(); // input inválido, pergunta de novo
-}
-```
+---
 
-A diferença é que, em Assembly, esse `if/if/if` não é açúcar sintático escondendo alguma coisa — **é literalmente isso que a CPU faz**, instrução por instrução, sem ninguém traduzindo nada pra você.
+## As instruções usadas neste projeto
 
-### Sem `if`, sem `for`, sem funções de verdade — só isso aqui:
-
-| Instrução | Pra que serve | Analogia |
-|---|---|---|
-| `cmp a, b` | Compara dois valores e guarda o resultado numa "flag" invisível | O `===` por trás de todo `if` |
-| `je` / `jne` | Pula **se** a comparação anterior deu igual / diferente | O corpo de um `if` / `else` |
-| `jmp` | Pula sempre, sem condição | Um `goto` puro — o ancestral de todo `while(true)` |
-| `call` / `ret` | Guarda o endereço de retorno na pilha e pula; depois volta | `function() {}` + `return`, sem closures |
-
-### O loop e o contador de reincarnações
-
-O jogo guarda quantas vezes você já reiniciou, num pedacinho de memória reservado (não inicializado) na seção `.bss`:
+### `mov` — copiar dados
 
 ```asm
-loop_counter: resq 1    ; reserva 8 bytes (1 quad word) — tipo um "let loopCounter" sem valor inicial
+mov rax, SYS_WRITE   ; rax = 1
+mov rdi, STDOUT      ; rdi = 1
+mov rsi, q1_text     ; rsi = endereço da string
+mov rdx, 42          ; rdx = quantos bytes escrever
 ```
 
-- Incrementado toda vez que a execução volta pro `.game_start`
-- Mostrado no header como `// loop_count: NNN`
-- Na primeira execução (`loop_count == 1`), mostra a introdução completa
-- Da segunda em diante, pula direto pro jogo — a Wired não repete a mesma explicação duas vezes pra você, mas também não esquece que você já ouviu
+O nome é enganoso: `mov` não move nada, ele **copia**. O equivalente em JS é uma atribuição normal, mas aqui você escolhe exatamente onde o valor vai morar: registrador de 64 bits (`rax`), 32 (`eax`), 16 (`ax`) ou 8 bits (`al`). Cada tamanho importa.
 
-### Delays com nanossegundos (o "typing effect" da Lain)
-
-O final do jogo simula alguém digitando devagar, mensagem por mensagem. Em JS você faria isso com `await new Promise(r => setTimeout(r, ms))`. Aqui, o "await" é uma syscall que efetivamente congela a CPU:
+### `cmp` + saltos condicionais — o único "if" que existe
 
 ```asm
-delay_ms:
-    mov   rax, rdi
-    div   rcx                 ; rax = segundos, rdx = milissegundos restantes
-    imul  rdx, 1000000        ; converte ms → nanossegundos
-    mov   [ts_sleep], rax
-    mov   [ts_sleep+8], rdx
-    mov   rax, SYS_NANOSLEEP
+cmp al, '1'    ; subtrai internamente, atualiza flags
+je .q1_ans1    ; pula se Zero Flag = 1 (valores iguais)
+jne .q1        ; pula se Zero Flag = 0 (valores diferentes)
+jmp .q1        ; pula sempre, sem condição
+```
+
+`cmp` subtrai os dois valores e joga fora o resultado, mas guarda as flags. Os saltos (`je`, `jne`, `jg`, `jl`) consultam essas flags pra decidir se pulam. Todo `if` em toda linguagem compila pra isso.
+
+### `call` e `ret` — funções sem assinatura de tipo
+
+```asm
+mov rdi, final_msg1
+call print_str        ; empilha endereço de retorno, pula pra print_str
+; ... executa ...
+ret                   ; desempilha e volta
+```
+
+A convenção Linux x86-64 (System V ABI) diz que argumentos vão em `rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9` nessa ordem. Então `mov rdi, final_msg1` seguido de `call print_str` é exatamente `print_str(final_msg1)`, só escrito diferente.
+
+### `push` e `pop` — preservando registradores
+
+```asm
+print_str:
+    push rbx         ; salva o valor atual de rbx
+    mov rbx, rdi     ; usa rbx pra varrer a string
+    ; ...
+    pop rbx          ; restaura antes de retornar
+    ret
+```
+
+Se você usa um registrador dentro de uma rotina e não restaura antes do `ret`, o código que chamou vai encontrar um valor diferente do que esperava. Nenhuma mensagem de erro. Só comportamento incorreto silencioso.
+
+### `div` — divisão que usa dois registradores ao mesmo tempo
+
+```asm
+mov rax, [loop_counter]
+xor rdx, rdx             ; zera rdx (obrigatório)
+mov rcx, 10
+div rcx                  ; rax = quociente, rdx = resto
+add al, '0'              ; converte 0-9 pra char ASCII
+```
+
+`div` divide `rdx:rax` (128 bits) pelo operando. Por isso o `xor rdx, rdx` antes é obrigatório: sem isso, `rdx` tem lixo e a divisão dá resultado errado ou causa uma exception. O `xor reg, reg` pra zerar é idioma padrão em Assembly, mais rápido que `mov rdx, 0`.
+
+### `imul` — multiplicação com sinal
+
+```asm
+imul rdx, 1000000    ; rdx = rdx * 1.000.000 (converte ms para ns)
+```
+
+Usada na rotina `delay_ms` pra converter milissegundos em nanossegundos antes de passar pro `nanosleep`. Em contextos de segurança, `imul` mal calculado é fonte clássica de integer overflow.
+
+### `syscall` — pedido direto ao kernel
+
+```asm
+mov rax, SYS_WRITE    ; qual serviço
+mov rdi, STDOUT       ; argumentos...
+mov rsi, q1_text
+mov rdx, 42
+syscall
+```
+
+`syscall` transfere o controle pro kernel do Linux. O número em `rax` diz qual serviço você quer. Não existe `printf` aqui. Se quer texto na tela, você constrói o pedido na mão e entrega pro kernel.
+
+### Macros: código que se expande antes de compilar
+
+```asm
+%macro print 2
+    mov rax, SYS_WRITE
+    mov rdi, STDOUT
+    mov rsi, %1
+    mov rdx, %2
     syscall
+%endmacro
 ```
 
-Sem event loop, sem microtask queue — o processo simplesmente para de existir por um tempinho e o kernel acorda ele depois.
+`print q1_text, 42` não chama uma função. O NASM **cola literalmente** aquelas 5 linhas no lugar. Zero overhead de call/ret, zero abstração. É um snippet que o compilador aplica antes de compilar.
 
-### ASCII art direto na memória
+---
 
-O rosto da Lain (26 linhas de Braille/Unicode) não é "renderizado" em lugar nenhum — ele já nasce pronto, como bytes crus dentro da seção `.data`:
+## Seções de memória
 
 ```asm
-lain_art:
-    db '⠀⠀⠀⢠⡟⣽⣿...', 10
-    db '⠀⠀⢀⡟⣽⣿...', 10
-    ; ... 24 linhas depois
-    db '⣿⣿⣿⣿⣿⣿...', 10, 10, 0
+section .data    ; strings e dados fixos
+section .bss     ; memória reservada, zerada pelo SO, sem valor inicial
+section .text    ; código executável
 ```
 
-`10` é o byte de newline (`\n`) e o `0` final marca "acabou a string" pra função `print_str` — o mesmo princípio de uma string em C, e bem diferente de uma string em JS/C#, que já carrega o próprio tamanho junto.
+Em JS você nunca pensa nisso. Em Assembly você escolhe onde cada byte mora. O loader do SO usa essa separação pra aplicar permissões diferentes em cada seção: `.text` é executável mas não gravável, `.data` é gravável mas não executável. Isso importa muito quando você começa a pensar em shellcode.
 
 ---
 
-## 🛠️ Stack técnica
+## Por que aprendi Assembly e por que isso importa em Offensive Security
 
-| Componente | Tecnologia |
-|---|---|
-| Linguagem | NASM x86-64 Assembly |
-| ABI | Linux syscall direta (sem libc) |
-| Arquitetura | x86-64 |
-| Syscalls usadas | `write(1)`, `read(0)`, `nanosleep(35)`, `exit(60)` |
-| Seções | `.data` (strings), `.bss` (variáveis), `.text` (código) |
-| Tema | Serial Experiments Lain |
+Esse projeto não foi feito pra ser um jogo polido. Foi feito pra aprender Assembly de verdade, com um pretexto que tornasse o processo menos entediante que "Hello World" pela décima vez.
 
-### Zero dependências externas
+O motivo é direto: estudo Offensive Security e quero trabalhar com engenharia reversa. E Assembly não é opcional nessa área.
 
-O binário final **não linka com libc**. Toda comunicação com o sistema operacional acontece via syscalls Linux diretas — sem `printf`, sem `malloc`, sem `stdio.h`:
+### Como Assembly aparece na engenharia reversa
 
-```asm
-%define SYS_WRITE     1    ; escrever no terminal
-%define SYS_READ      0    ; ler input do teclado
-%define SYS_NANOSLEEP 35   ; delays precisos entre mensagens
-%define SYS_EXIT      60   ; encerrar o processo
-```
+Quando você abre um executável no Ghidra, IDA Pro ou Binary Ninja, você não vê C, não vê Python, não vê TypeScript. Você vê Assembly descompilado, às vezes nem isso: só bytes que a ferramenta tenta traduzir de volta pras instruções originais. Quanto mais você entende do que está lendo, melhor é a análise.
 
-Isso é o equivalente a, em vez de usar `fetch()`, montar o pacote TCP na mão. Ninguém faz isso em produção — mas fazer isso **uma vez** ensina o que `fetch()` está escondendo de você o tempo todo.
+**Buffer overflow:** ler o prólogo de uma função e ver `sub rsp, 0x40` te diz que 64 bytes foram reservados na stack. Se o programa deixa você escrever mais que isso sem checar, você encontrou o overflow. Sem saber ler o Assembly, você não enxerga onde a stack começa e onde termina.
 
----
+**Shellcode:** shellcode é Assembly puro, frequentemente ofuscado, sem símbolos, sem nomes de função. O trabalho é pegar uma sequência de bytes e ler instrução por instrução até entender o que faz. `xor eax, eax` no início de um shellcode é o jeito clássico de zerar `eax` sem usar o byte `\x00`, que quebraria strings em C. Você só reconhece isso se já escreveu Assembly antes.
 
-## 📚 O que aprendi fazendo isso
+**Malware:** malware moderno usa syscalls diretas sem passar pela API do sistema, exatamente como esse projeto faz no Linux. Usa código automodificável, instruções raras pra confundir disassemblers. Cada técnica faz sentido só se você entende as instruções por baixo.
 
-### Conceitos de Assembly
+**ROP chains:** em exploração de binários, você constrói ROP chains: sequências de instruções já existentes no binário encadeadas pra executar código arbitrário. Cada "gadget" é um fragmento de Assembly terminando em `ret`. Pra montar isso, você precisa ler Assembly e entender o fluxo de controle.
 
-- **Syscalls Linux diretas** — como invocar o kernel sem libc, passando argumentos nos registradores certos, na ordem certa
-- **Registradores x86-64** — `rax` (número da syscall), `rdi` (1º arg), `rsi` (2º arg), `rdx` (3º arg), `al` (o "byte baixo" de `rax`, usado pra comparar caracteres)
-- **Seções de memória** — `.data` (dados já inicializados), `.bss` (memória reservada, zerada pelo SO), `.text` (código executável)
-- **Strings null-terminated** — sem tamanho embutido; o fim é marcado por um byte `0`, e alguém precisa procurar por ele
-- **Cálculo de tamanho em runtime** — `print_str` varre byte a byte até achar o `0`, pra descobrir quantos bytes escrever
+### Por que escrever é diferente de só ler
 
-### Controle de fluxo sem abstrações
+A maioria das pessoas que começa em offsec tenta ir direto pro Ghidra sem nunca ter escrito uma linha de Assembly. O resultado é que leem o disassembly como uma língua estrangeira que nunca estudaram: reconhecem palavras isoladas, mas não a estrutura.
 
-- Como `if/else` vira `cmp` + `je`/`jne`
-- Como loops viram `jmp` de volta pra um label anterior
-- Como `switch/case` vira uma sequência de `cmp` + `je`
-- Como funções viram `call` + `ret`, com argumentos combinados em registradores por convenção — não por assinatura de tipo
+Escrever um projeto inteiro em Assembly inverte esse processo. Todo `if` que você escreveu virou `cmp` + `je`. Todo loop que você fez tem um `jmp` pra trás. Toda função usa `call`/`ret` com argumentos em registradores. Quando você abre um binário depois, você já sabe o que está procurando porque você mesmo já escreveu assim.
 
-### Por que repetir o mesmo padrão 9 vezes?
-
-**Foi intencional.** Repetir `print → read → cmp → je` em cada pergunta funciona como uma curva de aprendizado embutida no próprio código:
-
-1. **Q1:** você entende o padrão lendo o código
-2. **Q2:** já começa a lembrar sem precisar consultar
-3. **Q5:** já escreve sem pensar
-4. **Q9:** o padrão está gravado — memória muscular, não mais leitura
-
-É a mesma lógica temática do jogo: **o loop existe pra que você entenda o padrão antes de conseguir sair dele.**
-
-### Debugging e ferramentas
-
-- **Montagem:** `nasm -f elf64` gera um objeto ELF64
-- **Linkagem:** `ld` junta as seções num binário executável
-- **Tamanho do binário:** Assembly puro sem libc fecha em **menos de 20 KB**
-- **Erros comuns:** esquecer o `0` no final de uma string, usar o registrador errado numa syscall, não preservar registradores dentro de uma rotina (o equivalente Assembly de mutar uma variável global que outra função não esperava)
+Esse jogo foi esse exercício.
 
 ---
 
-## 🚀 Como rodar
+## Como rodar
 
 ### Pré-requisitos
 
-- **Linux** (nativo, VM ou WSL2)
-- **NASM** (Netwide Assembler)
-- **ld** (GNU linker, incluso no binutils)
-
-### Instalação
+Linux nativo, VM ou WSL2, com NASM e binutils instalados.
 
 ```bash
-# Ubuntu/Debian
-sudo apt update && sudo apt install nasm binutils -y
+# Ubuntu/Debian/WSL
+sudo apt install nasm binutils -y
 
 # Arch
 sudo pacman -S nasm binutils
@@ -250,97 +232,54 @@ sudo pacman -S nasm binutils
 sudo dnf install nasm binutils
 ```
 
-### Baixando o projeto (`git clone`, explicado sem pressupor nada)
-
-Se você nunca mexeu com Git: `git clone` é só o comando que **copia um repositório inteiro do GitHub pro seu computador**. Você cola a URL do repositório, o Git cria uma pasta com o mesmo nome dele, e baixa todos os arquivos ali dentro — é o equivalente a baixar um `.zip` e extrair, só que de um jeito que já vem rastreando o histórico de versões.
-
-O nome depois da última barra na URL (`LainGame`, no caso deste projeto) é o **nome do repositório** — e também vira o nome da pasta criada na sua máquina.
+### Clonar e compilar
 
 ```bash
 git clone https://github.com/BunnyGhost/LainGame.git
 cd LainGame
+
+nasm -f elf64 loop.asm -o loop.o   # Assembly -> objeto ELF64
+ld loop.o -o loop                  # objeto -> executável
+chmod +x loop
+./loop
 ```
 
-### Compilar e executar
-
-```bash
-nasm -f elf64 loop.asm -o loop.o   # monta Assembly → objeto
-ld loop.o -o loop                  # linka objeto → executável
-chmod +x loop                      # permissão de execução
-./loop                             # roda o jogo
-```
-
-### Comando único (build + run)
+### Comando único
 
 ```bash
 nasm -f elf64 loop.asm -o loop.o && ld loop.o -o loop && ./loop
 ```
 
-### Tamanho do binário final
-
-```bash
-$ ls -lh loop
--rwxr-xr-x 1 user user 18K loop
-```
-
-18 KB. Sem engine, sem framework, sem runtime — só Assembly. Pra efeito de comparação, um "Hello World" em Electron já passa dos 100 MB.
+| Comando | O que faz |
+|---|---|
+| `nasm -f elf64` | Converte Assembly em objeto ELF64 com as seções separadas |
+| `ld` | Junta as seções num binário executável |
+| `chmod +x` | Marca como executável pro SO |
 
 ---
 
-## 🎮 Como jogar
+## Como jogar
 
-1. **Leia** cada pergunta com atenção
-2. **Digite** o número da opção (1, 2, 3 ou 4)
-3. **Pressione Enter**
-4. Respostas erradas podem:
-   - Voltar pra perguntas anteriores
-   - Reiniciar o loop inteiro (`jmp .game_start`)
-   - Repetir a mesma pergunta até você acertar
-5. O header mostra `loop_count` — quantas vezes você já reiniciou
-6. **Só existe uma sequência correta** que leva ao final verdadeiro
-
-### Dica
-
-Preste atenção nas **mensagens depois de cada resposta**. Elas carregam pistas sobre o caminho certo. A Wired registra tudo. Você esquece.
+- Digite o número da opção e pressione Enter
+- Respostas erradas voltam pra perguntas anteriores ou reiniciam o loop
+- O header mostra `loop_count`, quantas vezes você já reiniciou
+- Só existe uma sequência que leva ao final verdadeiro
+- Preste atenção nas mensagens após cada resposta
 
 ---
 
-## 📁 Estrutura do projeto
+## Referências temáticas
 
-```
-LainGame/
-├── loop.asm          # código-fonte completo (~1100 linhas)
-├── loop.o            # objeto ELF64 (gerado pelo nasm)
-├── loop              # binário executável final
-└── README.md         # este arquivo
-```
-
----
-
-## 🎨 Temas e referências
-
-| Elemento do jogo | Referência em Lain |
+| Elemento | Referência em Lain |
 |---|---|
 | `node: lain@wired.net/self/0x00000000` | Endereçamento de nós na Wired |
-| `layer_id: UNKNOWN_PROTOCOL` | Camadas de realidade do Protocolo 7 |
+| `layer_id: UNKNOWN_PROTOCOL` | Camadas do Protocolo 7 |
 | `loop_count` | Ciclos de reencarnação digital |
 | `[ERROR: NULL SELF]` | Dissolução do ego na rede |
-| `memory dump: [REDACTED]` | Memórias injetadas/removidas |
-| Pergunta sobre "Knights" | Os Knights of the Eastern Calculus |
-| ASCII art do rosto | Representação visual de Lain na Wired |
-| Final com mensagens pausadas | Consciência fragmentada se comunicando |
+| Pergunta sobre "Knights" | Knights of the Eastern Calculus |
+| ASCII art do rosto | Lain na Wired |
+| Final com delays | Consciência fragmentada se comunicando |
 | `SELF: DISSOLVED` | Fusão final com a Wired |
-
----
-
-## 🧪 Possíveis extensões
-
-- [ ] Sons via syscall `ioctl` pra beeps do PC speaker
-- [ ] Cores ANSI pra destacar camadas e erros
-- [ ] Mais finais alternativos baseados em combinações de respostas
-- [ ] Easter eggs com comandos especiais (ex: digitar `lain` a qualquer momento)
-- [ ] Port pra WASM, pra rodar no navegador
-- [ ] Salvar `loop_count` em disco via `open`/`write`, pra persistir entre execuções
 
 ---
 
